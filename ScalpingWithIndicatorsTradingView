@@ -1,0 +1,37 @@
+//@version=5
+lotSize = 25
+lots = 1
+qty = lotSize * lots
+strategy("Supertrend Strategy", overlay=true, calc_on_every_tick = true, commission_type = strategy.commission.cash_per_order, commission_value =  150,
+         slippage = 20, initial_capital = 5000000)
+marketSession = input.session(title='Market session', defval='0920-1520', confirm=true, group='Intraday Controls')
+
+atrPeriod = input(10, "ATR Length")
+factor = input.float(3.75, "Factor", step = 0.01)
+
+[_, direction] = ta.supertrend(factor, atrPeriod)
+
+stop = direction < 0 ? low : high
+diff = close - stop
+tp = close + diff * 2
+
+msg =  str.tostring(stop) + "," + str.tostring(tp)
+barInSession(sess) =>
+    time(timeframe.period, sess) != 0
+    
+bool intradaySession = barInSession(marketSession)
+
+if ta.change(direction) < 0 and intradaySession
+    if strategy.position_size > 0
+        strategy.cancel_all()
+    strategy.entry("L", strategy.long, qty = 25, comment = msg)
+    strategy.exit("LE", from_entry = "L", limit = tp, stop = stop)
+
+if ta.change(direction) > 0 and intradaySession
+    if strategy.position_size > 0
+        strategy.cancel_all()
+    strategy.entry("S", strategy.short, qty = 25, comment = msg)
+    strategy.exit("SE",from_entry = "S", limit = tp, stop = stop)
+
+if not intradaySession and strategy.position_size > 0
+    strategy.close_all()
